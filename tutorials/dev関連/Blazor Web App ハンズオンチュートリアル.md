@@ -250,11 +250,292 @@ http://localhost:5008 にアクセスすると、以下の画面が表示され�
 + 1-3. `% dotnet new blazor -n [Project Name] -o [Directory Path]`でプロジェクト作成
 + 1-4. `% dotnet watch`でホットリロード
 
-# 2. モデルの作成・マイグレーション
+# 2. ページの作成
 
 ## 章目次
 
-2-1. モデルの作成
-2-2
+2-1. ルーティング
+2-2. ページ実装
 
-#  コンポーネントの作成
+## 2-1. ルーティング
+
+`http://localhost:xxxx/test-page/`というルーティングにしたいケースを例にします。
+新規ページを作成するには、任意の場所に.razor拡張子でファイルを作成します。
+今回は `Pages/TestPage.razor`を作成します。
+ルーティング（パス）は以下のように記述します。
+
+```Pages/TestPage.razor
+@page "/test-page"
+```
+
+このように記載することで、新しくルーティングが作成され、指定したURLにアクセスできるようになります。
+
+### ルートパラメータ
+
+`https://example.com/edit/{id}` のように、ルートパラメータを割り当てたいは、以下のように記述します。
+
+```Pages/Edit.razor
+@page "/edit/{id}"
+
+@code{
+	[Parameter]
+	public int Id { get; set; }
+}
+```
+
+`@page "/edit/{id:int}`のようにすると、制約を設けることも可能です。
+
+## 2-2. ページの実装
+
+ページの実装は、通常のHTML / CSS / JSを利用可能です。
+
+```
+@page "/test-page"
+
+<PageTitle>テストページ</PageTitle>
+
+<h1>テストページです<h1>
+
+<style>
+h1{
+	color: red;
+}
+</style>
+
+<script>
+console.log("テストページです");
+</script>
+```
+
+上部の`PageTitle`タグは、htmlタグでいうところの`<title>`を決定することができます。
+ブラウザタブに表示されるページタイトルのことです。
+
+
+## 2-3. C#コード
+
+`.razor`拡張子のファイルでは、`@code{}`の中に直接C#を記載することができます。
+
+例えば、チェックボックスに応じて表示するテキストを変えたい場合は以下のように記載します。
+
+```Test.razor
+@page "/test"
+@rendermode InteractiveServer //サーバーモードでページを表示する場合のおまじない
+
+<PageTitle>C#コードのテスト</PageTitle>
+
+@if(isChecked){
+	<p>チェックが入っています</p>
+} else {
+	<p>チェックが入っていません</p>
+}
+
+@code {
+	private bool isChecked { get; set; } = false;
+}
+```
+
+# 3. レイアウトの作成・適用
+
+Blazorプロジェクトでは、ページごとに異なるレイアウトを適用することができます。
+プロジェクト作成時は、`Layout/MainLayout.razor`が適用されています。
+これは`Components/Routes.razor`の中の`DefaultLayout`で適用されています。
+
+ログインページだけレイアウトを変更したいケースを考えてみます。
+
+`Layout/LoginLayout.razor`を作成します。
+
+```Layout/LoginLayout.razor
+@inherits LayoutComponentBase
+
+<div class="l-login">
+	@Body
+</div>
+```
+
+`@inherits LayoutComponentBase`を最初に記述することで、作成したコンポーネントがレイアウトコンポーネントであることを示します。
+
+`@Body`がある場所は、ページが実装される場所を示します。
+
+これを`Components/Pages/Login.razor`に適用してみましょう。
+
+```Login.razor
+@page "/login"
+@layout Layout.LoginLayout
+
+<PageTitle>ログイン画面</PageTitle>
+
+<h1>ログイン画面です</h1>
+```
+
+`@layout`でコンポーネントを指定してあげることで、ページごとに異なるレイアウトを適用させることが可能です。
+# 4. 再利用可能なコンポーネントの作成・挿入
+## 参考
+https://learn.microsoft.com/ja-jp/aspnet/core/blazor/components/?view=aspnetcore-9.0
+
+## 理想の形
+引数で特定のテキストやスタイルに文字列を挿入しながら、
+中身のコンテンツはHTMLで書きたい
+
+```html:TestPage.razor
+<Component Title="タイトル" Desc="説明が入る">
+    <p>フォームやらなんやらが入る</p>
+</Component>
+```
+
+## パラメータによる参照
+
+```html
+<Component Title="タイトル" Desc="説明が入る"> // ←これ
+</Component>
+```
+
+>''コンポーネント パラメーター'' によりデータがコンポーネントに渡されます。これらのパラメーターは、[Parameter] 属性を指定したコンポーネント クラス上で、パブリック C# プロパティを使用して定義されます。 次の例では、組み込みの参照型 (System.String) とユーザー定義の参照型 (PanelBody) がコンポーネント パラメーターとして渡されます。
+
+`[Parameter]`を使用して、組み込む変数を参照する
+
+### テスト実装
+
+```cs:Component.razor
+@code {
+    [Parameter]
+    public string Title { get; set; } = "";
+    
+    [Parameter]
+    public string Desc {get; set; } = "";
+}
+```
+
+```html:Component.razor
+<h2>@Title</h2>
+<p>@Desc</p>
+```
+
+```TestPage.razor
+<Component Title="タイトル" Desc="説明が入る" />
+```
+
+### 出力結果
+
+```html:HTML
+<h2>タイトル</h2>
+<p>説明が入る</p>
+```
+
+## レンダリングフラグメントの活用
+```html
+<Component Title="タイトル" Desc="説明が入る">
+    <p>フォームやらなんやらが入る</p> //←これ
+</Component>
+```
+
+>コンポーネントでは、別のコンポーネントのコンテンツを設定できます。 代入コンポーネントでは、子コンポーネントの開始および終了タグの間にコンテンツを指定します。
+
+>Razorマークアップ内の ChildContent の位置は、コンテンツが最終的な HTML 出力にレンダリングされる場所です。
+
+### テスト実装
+
+コンポーネント側：
+```cs:Component.razor
+<div class="child">
+    @ChildContent
+</div>
+
+@code{
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}
+```
+
+ページ側：
+```html:TestPage.razor
+<Component>
+    コンテンツが入ります
+</Component>
+```
+
+### 出力結果
+
+```html:HTML
+<div class="child">
+    コンテンツが入ります
+</div>
+```
+
+## Bootstrapモーダルを再利用可能なコンポーネントにする
+
+パラメータとレンダリングフラグメントを組み合わせて、モーダルを作成してみます。
+これでスッキリ。
+
+ページ側：
+```html:TestPage.razor（コンポーネント利用側）
+<Modal ModalTarget="staticBackdrop" ModalTitle="タイトル" SubmitButtonText="実行" CancelButtonText="キャンセル">
+  <div class="row mb-3">
+    <div class="col-3">
+      <label for="area" class="col-form-label d-flex justify-content-between align-items-center">フォーム：</label>
+    </div>
+
+    <div class="col-6">
+      <input type="text" name="" id="" class="form-control">
+    </div>
+  </div>
+</Modal>
+```
+
+コンポーネント側
+```html:Modal.razor
+<div class="modal fade" id="@ModalTarget" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+  aria-labelledby="staticBackdropLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content p-3">
+      <div class="modal-header justify-content-between align-items-start">
+        <p></p>
+        <div class="text-center">
+          <h1 class="modal-title fs-5 text-purple" id="staticBackdropLabel">@ModalTitle</h1>
+        </div>
+        <button type="button" class="btn-close m-0 p-0" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="conteiner-fluid">
+          @ChildContent
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-purple">@SubmitButtonText</button>
+        <button type="button" class="btn btn-outline-purple" data-bs-dismiss="modal">@CancelButtonText</button>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+```cs:Modal.razor
+@code {
+  [Parameter]
+  public string ModalTarget { get; set; } = "";
+
+  [Parameter]
+  public string ModalTitle { get; set; } = "";
+
+  [Parameter]
+  public string SubmitButtonText { get; set; } = "";
+  [Parameter]
+  public string CancelButtonText { get; set; } = "";
+
+  [Parameter]
+  public RenderFragment? ChildContent { get; set; }
+}
+```
+
+# 5. モデルの作成・マイグレーション
+
+## 章目次
+
+5-1. モデルの作成
+5-2. コンテキストの作成
+5-3. マイグレーション
+
+※※※更新予定※※※
+
+
+
+
